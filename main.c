@@ -1,110 +1,61 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <stdatomic.h>
+#include <string.h>
 
-#define READ_COUNT_LIMIT 128
-#define READ_BUFFER_SIZE 128
-
-int stat(int64_t termine, int64_t *max, int64_t *min, double *avg) {
-    // 64 bit ints so it is less likely for the user to input an invalid number
-
-    int64_t *inputs = malloc(sizeof(int64_t) * READ_COUNT_LIMIT);
+void process_line(char *input, char *line) {
+    size_t input_len, line_len;
     int i;
-    bool stop;
-    int64_t sum;
+    char current_input_char, current_line_char;
+    uint16_t diffs_count;
 
-    int read_count;
-    char read_buffer[READ_BUFFER_SIZE];
+    input_len = strlen(input);
+    line_len = strlen(line);
 
-    if (inputs == NULL) {
-        printf("memory error\n");
-        return 1;
+    if (input_len != line_len) {
+        // nothing to do
+        return;
     }
 
-    stop = false;
-    for (i = 0; i < READ_COUNT_LIMIT && !stop; i++) {
-        printf("inserisci un valore: ");
+    diffs_count = 0;
+    for (i = 0 ; i < input_len - 1; i++) {
+        current_input_char = input[i];
+        current_line_char = line[i];
 
-        // hopefully prevent memory corruption bugs
-        if (fgets(read_buffer, sizeof(read_buffer), stdin)) {
-            if (sscanf(read_buffer, "%lld", &inputs[i]) != 1) {
-                printf("read error");
-
-                // discard result as it is not valid
-                i--;
-            }
-        } else {
-            printf("read error");
-        }
-
-        if (inputs[i] == termine) {
-            stop = true;
-
-            // "termine" is discarded by using i before inc
-            read_count = i;
+        if (current_input_char != current_line_char) {
+            diffs_count++;
         }
     }
 
-    if (!stop) {
-        printf("hai raggiunto il limite di interi che puoi inserire\n");
-    } else if (read_count == 0) {
-        printf("non ho nessun valore con cui fare i calcoli\n");
-        return 1;
+    if (diffs_count == 1) {
+        printf("%s", line);
     }
-
-    *max = inputs[0];
-    *min = inputs[0];
-    sum = inputs[0];
-
-    for (i = 1; i < read_count; i++) {
-        int64_t current = inputs[i];
-
-        if (current > *max) {
-            *max = current;
-        }
-
-        if (current < *min) {
-            *min = current;
-        }
-
-        sum += current;
-    }
-
-    *avg = (double) sum / (double) read_count;
-
-    free(inputs);
-
-    return 0;
 }
 
 int main() {
-    int64_t max, min, stop;
-    double avg;
-    int code;
+    char input[35 + 1];
+    FILE *dict_file;
+    ssize_t read;
+    char *current_line;
+    size_t len = 0;
 
-    char read_buffer[READ_BUFFER_SIZE];
+    printf("inserisci la stringa di input: ");
+    fgets(input, sizeof(input), stdin);
 
-    printf("inserisci il valore di stop: ");
-    if (fgets(read_buffer, sizeof(read_buffer), stdin)) {
-        if (sscanf(read_buffer, "%lld", &stop) != 1) {
-            printf("read error\n");
-            return 1;
+    // curl -o dizionario.txt https://raw.githubusercontent.com/napolux/paroleitaliane/master/paroleitaliane/60000_parole_italiane.txt
+    dict_file = fopen("./dizionario.txt", "r");
+    if (dict_file == NULL) {
+        perror("impossibile aprire il file dizionario.txt\n");
+        return 1;
+    }
+
+    while ((read = getline(&current_line, &len, dict_file) != -1)) {
+        if (read > 0) {
+            process_line(input, current_line);
         }
-    } else {
-        printf("read error\n");
-        return 1;
     }
 
-    code = stat(stop, &max, &min, &avg);
-
-
-    if (code == 0) {
-        printf("max: %lld, min: %lld, avg: %f\n", max, min, avg);
-    } else {
-        // function got an error, results is invalid memory
-        return 1;
-    }
+    free(current_line);
 
     return 0;
 }
